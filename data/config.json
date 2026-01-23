@@ -1,0 +1,34 @@
+{
+  "window_trading_days": 7,
+  "min_top10_appearances_in_window": 3,
+
+  "trade_cv_max": 0.8,
+  "turnover_threshold_lkr": 20000000,
+
+  "avg_trade_value_limits_lkr": {
+    "lower": 5000,
+    "upper": 250000
+  },
+
+  "market_cap_min_lkr": 5000000000,
+
+  "beta_limits": {
+    "lower": 0.7,
+    "upper": 1.5
+  },
+
+  "range_ratio_limits": {
+    "min": 0.005,
+    "max_extreme": 0.12,
+    "extreme_days_max": 2
+  },
+
+  "scoring": {
+    "whitelist_min_score": 8
+  },
+
+  "churn": {
+    "remove_if_fail_hard_rules_consecutive": 3,
+    "remove_if_avg_turnover_below_threshold_consecutive": 5
+  }
+}
