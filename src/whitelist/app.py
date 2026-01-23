@@ -28,7 +28,7 @@ def main():
     daily_repo = DailyRepository(paths)
     output_repo = OutputRepository(paths)
 
-    pipeline = Pipeline(settings, calendar, client, stock_repo, daily_repo, output_repo)
+    pipeline = Pipeline(settings, calendar,client, stock_repo, daily_repo, output_repo)
     pipeline.run(d, RunStats(d.isoformat(), calendar.is_trading_day(d)))
 
 if __name__ == "__main__":
