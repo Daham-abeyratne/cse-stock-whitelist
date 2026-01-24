@@ -7,6 +7,8 @@ class TradingCalendar:
         self.holidays = holidays
 
     def is_trading_day(self, d: date):
+        if d in self.holidays:
+            print("its a holiday")
         return d.weekday() < 5 and d not in self.holidays
 
     def last_n_trading_days(self, end: date, n: int):
