@@ -1,5 +1,5 @@
 {
   "exchange": "CSE",
   "timezone": "Asia/Colombo",
-  "holidays": []
+  "holidays": ["2026-02-04"]
 }
