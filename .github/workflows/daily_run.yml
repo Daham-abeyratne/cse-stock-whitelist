@@ -1,0 +1,71 @@
+name: Daily CSE Stock Whitelist Run
+
+on:
+  schedule:
+    # 17:00 Asia/Colombo == 11:30 UTC, Monday–Friday
+    - cron: "0 12 * * 1-5"
+  workflow_dispatch: {}  # allow manual run from UI
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daily-cse-stock-whitelist
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout PUBLIC code repo
+      - name: Checkout code repository
+        uses: actions/checkout@v4
+
+      # 2️⃣ Setup Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # 3️⃣ Install dependencies
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install -e .
+
+      # 4️⃣ Clone PRIVATE data repo and restore previous state
+      - name: Clone data repository
+        env:
+          GH_TOKEN: ${{ secrets.DATA_REPO_TOKEN }}
+        run: |
+          git clone https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository_owner }}/cse-stock-whitelist-data.git data_repo
+
+          # Restore previous persisted data into working directory
+          mkdir -p data
+          cp -r data_repo/data/* data/ || true
+
+      # 5️⃣ Run your pipeline
+      - name: Run whitelist pipeline
+        run: |
+          python -m whitelist.app --data-dir data
+
+      # 6️⃣ Push updated data back to PRIVATE repo
+      - name: Push updated data back
+        env:
+          GH_TOKEN: ${{ secrets.DATA_REPO_TOKEN }}
+        run: |
+          rm -rf data_repo/data
+          mkdir -p data_repo/data
+          cp -r data/* data_repo/data/
+
+          cd data_repo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add data/
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+
+          git commit -m "Daily data update $(date -u +'%Y-%m-%d %H:%M UTC')"
+          git push
