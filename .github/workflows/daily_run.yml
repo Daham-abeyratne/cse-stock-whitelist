@@ -33,7 +33,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install -e .
+
+      - name: Make src importable
+        run: |
+          echo "PYTHONPATH=$GITHUB_WORKSPACE/src" >> $GITHUB_ENV
+
 
       # 4️⃣ Clone PRIVATE data repo and restore previous state
       - name: Clone data repository
