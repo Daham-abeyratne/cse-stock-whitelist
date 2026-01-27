@@ -3,9 +3,7 @@ name: Daily CSE Stock Whitelist Run
 on:
   workflow_dispatch:
   schedule:
-    # Weekdays at 17:30 Asia/Colombo
-    - cron: "30 17 * * 1-5"
-      timezone: "Asia/Colombo"
+    - cron: "*/5 * * * *"   # 12:00 UTC = 17:30 Asia/Colombo (Mon–Fri)
 
 permissions:
   contents: read
