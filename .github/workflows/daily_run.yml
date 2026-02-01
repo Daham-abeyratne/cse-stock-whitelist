@@ -1,0 +1,65 @@
+name: Daily CSE Stock Whitelist Run
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "2 12 * * 1-5"   # 12:00 UTC = 17:30 Asia/Colombo (Mon–Fri)
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daily-cse-stock-whitelist
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Make src importable
+        run: |
+          echo "PYTHONPATH=$GITHUB_WORKSPACE/src" >> $GITHUB_ENV
+
+      - name: Clone data repository
+        env:
+          GH_TOKEN: ${{ secrets.DATA_REPO_TOKEN }}
+        run: |
+          git clone https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository_owner }}/cse-stock-whitelist-data.git data_repo
+          mkdir -p data
+          cp -r data_repo/data/* data/ || true
+
+      - name: Run whitelist pipeline
+        run: |
+          python -m whitelist.app --data-dir data
+
+      - name: Push updated data back
+        env:
+          GH_TOKEN: ${{ secrets.DATA_REPO_TOKEN }}
+        run: |
+          rm -rf data_repo/data
+          mkdir -p data_repo/data
+          cp -r data/* data_repo/data/
+
+          cd data_repo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add data/
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+
+          git commit -m "Daily data update $(date -u +'%Y-%m-%d %H:%M UTC')"
+          git push
