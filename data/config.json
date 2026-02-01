@@ -1,6 +1,7 @@
 {
   "window_trading_days": 7,
-  "min_top10_appearances_in_window": 3,
+  "window_trading_days_temp": 3,
+  "min_top10_appearances_in_window": 2,
 
   "trade_cv_max": 0.8,
   "turnover_threshold_lkr": 20000000,
@@ -24,8 +25,10 @@
   },
 
   "scoring": {
-    "whitelist_min_score": 8
+    "whitelist_min_score": 8,
+    "candidate_min_score": 4
   },
+
 
   "churn": {
     "remove_if_fail_hard_rules_consecutive": 3,

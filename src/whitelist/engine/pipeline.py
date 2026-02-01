@@ -18,12 +18,12 @@ class Pipeline:
             return
 
         day_iso = iso(d)
-
         records = self.repo.load_all()
         top10, top10_metrics = self.client.fetch_top10_snapshot(d)
         keep = {iso(x) for x in self.calendar.last_n_trading_days(d, self.settings.window_trading_days)}
 
         fetch_set = set(top10) | {s for s, r in records.items() if r.state.status != Status.CHURNED}
+
 
         # --- write daily snapshot (raw evidence for the day) ---
         if self.daily_repo is not None:
@@ -55,7 +55,6 @@ class Pipeline:
                 low=daily.low,
                 close=daily.close
             ))
-
             rec.trim_history(keep)
             evalr = evaluate(rec, self.settings)
             if evalr:
@@ -93,14 +92,12 @@ class Pipeline:
                         "beta_aspi": r.static.beta_aspi,
                         "beta_sl20": r.static.beta_sl20
                     })
-                elif r.state.status == Status.TRACK:
-                    # basic candidate definition: has enough history to be evaluated
-                    if len(r.history) >= self.settings.window_trading_days:
-                        candidates.append({
-                            "symbol": sym,
-                            "days_in_window": len(r.history),
-                            "top10_appearances": sum(h.in_top10 for h in r.history)
-                        })
+                elif r.state.status == Status.CANDIDATE:
+                    candidates.append({
+                        "symbol": sym,
+                        "days_in_window": len(r.history),
+                        "top10_appearances": sum(h.in_top10 for h in r.history)
+                    })
 
             self.output_repo.save_whitelist_latest({
                 "as_of": day_iso,
@@ -116,4 +113,3 @@ class Pipeline:
             runstats.top10_count = len(top10)
 
             self.output_repo.save_runlog_latest(runstats.to_dict())
-        print(len(fetch_set))

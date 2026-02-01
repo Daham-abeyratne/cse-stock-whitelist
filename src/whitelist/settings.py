@@ -28,6 +28,7 @@ class Settings:
     extreme_days_max: int
 
     whitelist_min_score: int
+    candidate_min_score: int
 
     churn_fail_hard_n: int
     churn_low_turn_n: int
@@ -66,6 +67,7 @@ def load_settings(data_dir: Path) -> Settings:
             extreme_days_max=int(cfg["range_ratio_limits"]["extreme_days_max"]),
 
             whitelist_min_score=int(cfg["scoring"]["whitelist_min_score"]),
+            candidate_min_score=int(cfg["scoring"]["candidate_min_score"]),
 
             churn_fail_hard_n=int(cfg["churn"]["remove_if_fail_hard_rules_consecutive"]),
             churn_low_turn_n=int(cfg["churn"]["remove_if_avg_turnover_below_threshold_consecutive"]),

@@ -175,6 +175,4 @@ class CSEClient:
         # keep only those in top10
         metrics = {s: metrics[s] for s in top10_unique if s in metrics}
 
-        print("mostActiveTrades keys:", list(data[0].keys()))
-
         return top10_unique, metrics

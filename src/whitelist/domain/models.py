@@ -25,6 +25,7 @@ class StockState:
     status: Status = Status.TRACK
     first_seen: str = ""
     last_updated: str = ""
+    candidated_on: Optional[str] = None
     whitelisted_on: Optional[str] = None
     churned_on: Optional[str] = None
     fail_hard_rules_consecutive: int = 0
