@@ -3,6 +3,7 @@ from ..domain.types import Status
 from ..util.timeutils import iso
 from .evaluator import evaluate
 from .transitions import apply_transition
+from .metrics import cv  # NEW: We need this to calculate the 10-day CV for ML
 
 class Pipeline:
     def __init__(self, settings, calendar, client, stock_repo, daily_repo, output_repo):
@@ -20,12 +21,17 @@ class Pipeline:
         day_iso = iso(d)
         records = self.repo.load_all()
         top10, top10_metrics = self.client.fetch_top10_snapshot(d)
+        
         keep = {iso(x) for x in self.calendar.last_n_trading_days(d, self.settings.window_trading_days)}
+        cool_down_keep = {iso(x) for x in self.calendar.last_n_trading_days(d, 14)}
 
-        fetch_set = set(top10) | {s for s, r in records.items() if r.state.status != Status.CHURNED}
+        fetch_set = set(top10)
+        for sym, r in records.items():
+            if r.state.status != Status.CHURNED:
+                fetch_set.add(sym)
+            elif r.state.churned_on and r.state.churned_on in cool_down_keep:
+                fetch_set.add(sym)
 
-
-        # --- write daily snapshot (raw evidence for the day) ---
         if self.daily_repo is not None:
             self.daily_repo.save_day_snapshot(day_iso, {
                 "date": day_iso,
@@ -34,17 +40,28 @@ class Pipeline:
             })
 
         for sym in fetch_set:
+            if sym not in records:
+                runstats.new_stocks_added_to_track += 1
+            
             rec = records.get(sym) or StockRecord(sym, StockState(first_seen=day_iso))
-            rec.state.last_updated = day_iso
-
+            runstats.tracked_stocks_fetched += 1
+            
             daily = self.client.fetch_daily_metrics(sym, d)
-
             raw = top10_metrics.get(sym, {}) if (sym in top10) else {}
+            
+            # --- FETCH STATIC EARLY --- 
+            # We must fetch static metrics now so evaluate() uses today's fresh data
+            sm = self.client.fetch_static_metrics(sym, d)
+            rec.static.market_cap = sm.market_cap
+            rec.static.beta_aspi = sm.beta_aspi
+            rec.static.beta_sl20 = sm.beta_sl20
+            rec.static.last_static_update = day_iso
 
             turnover = float(raw.get("turnover", 0.0) or 0.0) if (sym in top10) else daily.turnover
             trade_volume = float(raw.get("tradeVolume", 0.0) or 0.0) if (sym in top10) else daily.trade_volume
             share_volume = float(raw.get("shareVolume", 0.0) or 0.0) if (sym in top10) else daily.share_volume
 
+            # Append the basic price row first
             rec.append_history(HistoryRow(
                 date=day_iso,
                 in_top10=(sym in top10),
@@ -56,30 +73,40 @@ class Pipeline:
                 close=daily.close
             ))
             rec.trim_history(keep)
+
+            # Evaluate using today's appended price and static data
+            old_status = rec.state.status
             evalr = evaluate(rec, self.settings)
+            
+            current_score = 0
             if evalr:
+                hard_pass, beta_ok, score, avg_turn = evalr
+                current_score = score
+                rec.state.score = score
                 apply_transition(rec, evalr, d, self.settings)
 
-            # --- static refresh: fetch once if missing ---
-            needs_static = (
-                rec.static.market_cap == 0.0
-                and rec.static.beta_aspi is None
-                and rec.static.beta_sl20 is None
-            )
+            if old_status != rec.state.status:
+                if rec.state.status == Status.WHITELIST:
+                    runstats.whitelisted_added += 1
+                elif rec.state.status == Status.CHURNED:
+                    runstats.churned += 1
 
-            if needs_static:
-                sm = self.client.fetch_static_metrics(sym, d)
-                rec.static.market_cap = sm.market_cap
-                rec.static.beta_aspi = sm.beta_aspi
-                rec.static.beta_sl20 = sm.beta_sl20
-                rec.static.last_static_update = day_iso
+            # --- SNAPSHOT THE ML FEATURES ---
+            # Calculate the 10-day volatility specifically for the ML model
+            trades_10 = [h.trade_volume for h in rec.history[-10:]]
+            cv_10_val = cv(trades_10) if len(trades_10) > 1 else 0.0
+            
+            # Update the row we just appended with the Point-in-Time metrics
+            rec.history[-1].score = current_score
+            rec.history[-1].beta_aspi = rec.static.beta_aspi
+            rec.history[-1].market_cap = rec.static.market_cap
+            rec.history[-1].cv_10 = round(cv_10_val, 4)
 
             self.repo.save(rec)
 
-        # --- write outputs (consumable summaries for UI) ---
+        # --- WRITE OUTPUTS (Consumable summaries for UI) ---
         if self.output_repo is not None:
             all_records = self.repo.load_all()
-
             whitelist = []
             candidates = []
 
@@ -87,14 +114,15 @@ class Pipeline:
                 if r.state.status == Status.WHITELIST:
                     whitelist.append({
                         "symbol": sym,
+                        "score": r.state.score,
                         "whitelisted_on": r.state.whitelisted_on,
                         "market_cap": r.static.market_cap,
-                        "beta_aspi": r.static.beta_aspi,
-                        "beta_sl20": r.static.beta_sl20
+                        "beta_aspi": r.static.beta_aspi
                     })
                 elif r.state.status == Status.CANDIDATE:
                     candidates.append({
                         "symbol": sym,
+                        "score": r.state.score,
                         "days_in_window": len(r.history),
                         "top10_appearances": sum(h.in_top10 for h in r.history)
                     })
@@ -109,7 +137,6 @@ class Pipeline:
                 "candidates": sorted(candidates, key=lambda x: x["symbol"])
             })
 
-            # update runstats if you want (optional)
+            runstats.candidates_count = len(candidates)
             runstats.top10_count = len(top10)
-
             self.output_repo.save_runlog_latest(runstats.to_dict())
