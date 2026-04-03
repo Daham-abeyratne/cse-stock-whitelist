@@ -23,7 +23,7 @@ class Pipeline:
         top10, top10_metrics = self.client.fetch_top10_snapshot(d)
         
         keep = {iso(x) for x in self.calendar.last_n_trading_days(d, self.settings.window_trading_days)}
-        cool_down_keep = {iso(x) for x in self.calendar.last_n_trading_days(d, 14)}
+        cool_down_keep = {iso(x) for x in self.calendar.last_n_trading_days(d, 20)}
 
         fetch_set = set(top10)
         for sym, r in records.items():
