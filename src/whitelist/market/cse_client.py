@@ -11,6 +11,8 @@ class DailyMetrics:
     high: float
     low: float
     close: float
+    previous_close: float
+    change_percentage: float
 
 @dataclass(frozen=True)
 class StaticMetrics:
@@ -87,6 +89,8 @@ class CSEClient:
                     high=to_float(info.get("hiTrade", 0.0)),
                     low=to_float(info.get("lowTrade", 0.0)),
                     close=to_float(info.get("lastTradedPrice", 0.0)),
+                    previous_close=to_float(info.get("previousClose", 0.0)),
+                    change_percentage=to_float(info.get("changePercentage", 0.0)),
                 )
             except Exception as e:
                 last_err = e

@@ -47,4 +47,17 @@ class OutputRepository:
         write_json_atomic(self.paths.candidates(), payload)
 
     def save_runlog_latest(self, payload: dict):
-        write_json_atomic(self.paths.runlog(), payload)
+        try:
+            data = read_json(self.paths.runlog())
+            if isinstance(data, dict) and data:
+                data = [data]
+            elif not isinstance(data, list):
+                data = []
+        except Exception:
+            data = []
+            
+        # Prevent duplicates for the same day if pipeline is run twice
+        data = [d for d in data if d.get("run_date") != payload.get("run_date")]
+        data.append(payload)
+        
+        write_json_atomic(self.paths.runlog(), data)

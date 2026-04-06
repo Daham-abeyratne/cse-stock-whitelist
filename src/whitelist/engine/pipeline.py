@@ -70,7 +70,9 @@ class Pipeline:
                 trade_volume=trade_volume,
                 high=daily.high,
                 low=daily.low,
-                close=daily.close
+                close=daily.close,
+                previous_close=daily.previous_close,
+                change_percentage=daily.change_percentage
             ))
             rec.trim_history(keep)
 
@@ -96,11 +98,24 @@ class Pipeline:
             trades_10 = [h.trade_volume for h in rec.history[-10:]]
             cv_10_val = cv(trades_10) if len(trades_10) > 1 else 0.0
             
+            # Turnover Ratio
+            market_cap_floor = rec.static.market_cap * 0.0005
+            dynamic_turnover_threshold = max(self.settings.turnover_threshold_lkr, market_cap_floor)
+            turnover_10_mean = sum(h.turnover for h in rec.history) / len(rec.history) if rec.history else 0.0
+            turnover_ratio = turnover_10_mean / dynamic_turnover_threshold if dynamic_turnover_threshold else 0.0
+
+            # Momentum Ratio
+            lookback = max(0, len(rec.history) - 10)
+            recent_high = max((h.high for h in rec.history[lookback:]), default=0.0)
+            momentum_ratio = rec.history[-1].close / recent_high if recent_high > 0 else 0.0
+
             # Update the row we just appended with the Point-in-Time metrics
             rec.history[-1].score = current_score
             rec.history[-1].beta_aspi = rec.static.beta_aspi
             rec.history[-1].market_cap = rec.static.market_cap
             rec.history[-1].cv_10 = round(cv_10_val, 4)
+            rec.history[-1].turnover_ratio = round(turnover_ratio, 4)
+            rec.history[-1].momentum_ratio = round(momentum_ratio, 4)
 
             self.repo.save(rec)
 

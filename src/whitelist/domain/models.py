@@ -14,6 +14,10 @@ class HistoryRow:
     close: float
     
     # --- ML Point-in-Time Features ---
+    previous_close: float = 0.0
+    change_percentage: float = 0.0
+    turnover_ratio: float = 0.0
+    momentum_ratio: float = 0.0
     score: int = 0
     beta_aspi: Optional[float] = None
     market_cap: float = 0.0
